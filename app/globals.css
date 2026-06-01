@@ -19,8 +19,20 @@
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes seedFloat {
+  0% {
+    transform: translateX(0px) translateY(0px) rotate(0deg);
+  }
+
+  50% {
+    transform: translateX(-35px) translateY(12px) rotate(-4deg);
+  }
+
+  100% {
+    transform: translateX(0px) translateY(0px) rotate(0deg);
+  }
+}
+
+.animate-seedFloat {
+  animation: seedFloat 7s ease-in-out infinite;
 }
