@@ -19,27 +19,68 @@ type Memory = {
 
 export default function AdminPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadMemories();
   }, []);
 
   async function loadMemories() {
-    const { data } = await supabase
+    setLoading(true);
+
+    const { data, error } = await supabase
       .from("memories")
       .select("*")
       .order("created_at", { ascending: false });
 
+    if (error) {
+      console.error("Load Error:", error);
+      alert(`Load Error: ${error.message}`);
+    }
+
     setMemories(data || []);
+    setLoading(false);
   }
 
   async function approveMemory(id: number) {
-    await supabase.from("memories").update({ approved: true }).eq("id", id);
+    console.log("Approving memory:", id);
+
+    const { error } = await supabase
+      .from("memories")
+      .update({ approved: true })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Approve Error:", error);
+      alert(`Approve Error: ${error.message}`);
+      return;
+    }
+
+    alert("Memory approved.");
     loadMemories();
   }
 
   async function deleteMemory(id: number) {
-    await supabase.from("memories").delete().eq("id", id);
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete this memory?"
+    );
+
+    if (!confirmed) return;
+
+    console.log("Deleting memory:", id);
+
+    const { error } = await supabase
+      .from("memories")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Delete Error:", error);
+      alert(`Delete Error: ${error.message}`);
+      return;
+    }
+
+    alert("Memory deleted.");
     loadMemories();
   }
 
@@ -49,6 +90,18 @@ export default function AdminPage() {
         <h1 className="mb-8 font-serif text-5xl text-[#8f5f66]">
           Memory Admin
         </h1>
+
+        {loading && (
+          <div className="rounded-3xl bg-white p-6 shadow-lg">
+            Loading memories...
+          </div>
+        )}
+
+        {!loading && memories.length === 0 && (
+          <div className="rounded-3xl bg-white p-6 shadow-lg">
+            No memories found.
+          </div>
+        )}
 
         <div className="space-y-6">
           {memories.map((memory) => (
@@ -72,11 +125,15 @@ export default function AdminPage() {
                 />
               )}
 
-              <h2 className="text-2xl font-semibold">{memory.name}</h2>
+              <h2 className="text-2xl font-semibold">
+                {memory.name || "Anonymous"}
+              </h2>
 
-              <p className="mt-3 text-lg">{memory.message}</p>
+              <p className="mt-3 whitespace-pre-wrap text-lg">
+                {memory.message}
+              </p>
 
-              <p className="mt-3">
+              <p className="mt-4">
                 Status:
                 <span
                   className={
@@ -89,11 +146,11 @@ export default function AdminPage() {
                 </span>
               </p>
 
-              <div className="mt-4 flex gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 {!memory.approved && (
                   <button
                     onClick={() => approveMemory(memory.id)}
-                    className="rounded-full bg-green-600 px-4 py-2 text-white"
+                    className="rounded-full bg-green-600 px-5 py-2 text-white transition hover:bg-green-700"
                   >
                     Approve
                   </button>
@@ -101,7 +158,7 @@ export default function AdminPage() {
 
                 <button
                   onClick={() => deleteMemory(memory.id)}
-                  className="rounded-full bg-red-600 px-4 py-2 text-white"
+                  className="rounded-full bg-red-600 px-5 py-2 text-white transition hover:bg-red-700"
                 >
                   Delete
                 </button>
