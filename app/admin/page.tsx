@@ -1,12 +1,6 @@
 "use client";
 
-import { createClient } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { useState } from "react";
 
 type Memory = {
   id: number;
@@ -18,41 +12,69 @@ type Memory = {
 };
 
 export default function AdminPage() {
+  const [password, setPassword] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const [memories, setMemories] = useState<Memory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadMemories();
-  }, []);
-
-  async function loadMemories() {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from("memories")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Load Error:", error);
-      alert(`Load Error: ${error.message}`);
+  async function login() {
+    if (!password.trim()) {
+      alert("Enter the admin password.");
+      return;
     }
 
-    setMemories(data || []);
+    setLoading(true);
+
+    const res = await fetch("/api/admin/memories", {
+      headers: {
+        "x-admin-password": password,
+      },
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      alert(result.error || "Admin login failed.");
+      setLoading(false);
+      return;
+    }
+
+    setAdminPassword(password);
+    setMemories(result.memories || []);
     setLoading(false);
   }
 
+  async function loadMemories() {
+    const res = await fetch("/api/admin/memories", {
+      headers: {
+        "x-admin-password": adminPassword,
+      },
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      alert(result.error || "Could not load memories.");
+      return;
+    }
+
+    setMemories(result.memories || []);
+  }
+
   async function approveMemory(id: number) {
-    console.log("Approving memory:", id);
+    const res = await fetch("/api/admin/memories", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword,
+      },
+      body: JSON.stringify({ id }),
+    });
 
-    const { error } = await supabase
-      .from("memories")
-      .update({ approved: true })
-      .eq("id", id);
+    const result = await res.json();
 
-    if (error) {
-      console.error("Approve Error:", error);
-      alert(`Approve Error: ${error.message}`);
+    if (!res.ok) {
+      alert(result.error || "Could not approve memory.");
       return;
     }
 
@@ -67,21 +89,53 @@ export default function AdminPage() {
 
     if (!confirmed) return;
 
-    console.log("Deleting memory:", id);
+    const res = await fetch("/api/admin/memories", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-admin-password": adminPassword,
+      },
+      body: JSON.stringify({ id }),
+    });
 
-    const { error } = await supabase
-      .from("memories")
-      .delete()
-      .eq("id", id);
+    const result = await res.json();
 
-    if (error) {
-      console.error("Delete Error:", error);
-      alert(`Delete Error: ${error.message}`);
+    if (!res.ok) {
+      alert(result.error || "Could not delete memory.");
       return;
     }
 
     alert("Memory deleted.");
     loadMemories();
+  }
+
+  if (!adminPassword) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f8efe7] px-6 text-[#4b3f3a]">
+        <div className="w-full max-w-md rounded-[2rem] bg-white p-8 text-center shadow-2xl">
+          <h1 className="mb-6 font-serif text-4xl text-[#8f5f66]">
+            Admin Login
+          </h1>
+
+          <input
+            type="password"
+            placeholder="Admin password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && login()}
+            className="mb-5 w-full rounded-full border border-[#d8c2b5] px-5 py-4 text-center outline-none focus:ring-4 focus:ring-[#b07c82]/20"
+          />
+
+          <button
+            onClick={login}
+            disabled={loading}
+            className="rounded-full bg-[#b07c82] px-8 py-4 text-white shadow-lg transition hover:bg-[#96656a] disabled:opacity-60"
+          >
+            {loading ? "Checking..." : "Enter Admin"}
+          </button>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -91,13 +145,7 @@ export default function AdminPage() {
           Memory Admin
         </h1>
 
-        {loading && (
-          <div className="rounded-3xl bg-white p-6 shadow-lg">
-            Loading memories...
-          </div>
-        )}
-
-        {!loading && memories.length === 0 && (
+        {memories.length === 0 && (
           <div className="rounded-3xl bg-white p-6 shadow-lg">
             No memories found.
           </div>
